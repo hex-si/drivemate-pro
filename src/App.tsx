@@ -13,7 +13,6 @@ import EarningsPage from "@/pages/agent/EarningsPage";
 import ProfilePage from "@/pages/agent/ProfilePage";
 import NotificationsPage from "@/pages/agent/NotificationsPage";
 import LoginPage from "@/pages/auth/LoginPage";
-import SignupPage from "@/pages/auth/SignupPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
