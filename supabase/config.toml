@@ -1,1 +1,4 @@
 project_id = "cfcfcgjuvzradzctjhsk"
+
+[functions.hub-auth]
+verify_jwt = false

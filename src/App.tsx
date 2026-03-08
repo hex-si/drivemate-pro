@@ -13,7 +13,6 @@ import EarningsPage from "@/pages/agent/EarningsPage";
 import ProfilePage from "@/pages/agent/ProfilePage";
 import NotificationsPage from "@/pages/agent/NotificationsPage";
 import LoginPage from "@/pages/auth/LoginPage";
-import SignupPage from "@/pages/auth/SignupPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -48,7 +47,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Navigate to="/agent/dashboard" replace />} />
             <Route path="/auth/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
-            <Route path="/auth/signup" element={<PublicRoute><SignupPage /></PublicRoute>} />
+            <Route path="/auth/signup" element={<Navigate to="/auth/login" replace />} />
             <Route
               path="/agent"
               element={
