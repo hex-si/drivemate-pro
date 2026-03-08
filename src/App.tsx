@@ -47,7 +47,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Navigate to="/agent/dashboard" replace />} />
             <Route path="/auth/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
-            <Route path="/auth/signup" element={<PublicRoute><SignupPage /></PublicRoute>} />
+            <Route path="/auth/signup" element={<Navigate to="/auth/login" replace />} />
             <Route
               path="/agent"
               element={
