@@ -2,14 +2,10 @@
  * Central OrderHub Service
  * 
  * Connects to the external hub via WebSocket for realtime order updates
- * and REST API for status changes.
- * 
- * Replace HUB_URL and HUB_API_KEY with your actual values.
+ * and uses edge functions for secure API calls.
  */
 
-// TODO: Replace with your actual hub URL and API key
-const HUB_URL = import.meta.env.VITE_HUB_URL || "https://your-hub-url.com";
-const HUB_API_KEY = import.meta.env.VITE_HUB_API_KEY || "your-api-key";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface HubOrder {
   id: string;
@@ -35,20 +31,39 @@ class HubService {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private agentId: string = "";
   private agentName: string = "";
+  private hubUrl: string | null = null;
+  private apiKey: string | null = null;
 
-  connect(agentId: string, agentName: string) {
+  async connect(agentId: string, agentName: string) {
     this.agentId = agentId;
     this.agentName = agentName;
-    this.initWebSocket();
+    
+    // Fetch hub config from edge function
+    try {
+      const { data, error } = await supabase.functions.invoke("hub-config");
+      if (error) {
+        console.error("Failed to get hub config:", error);
+        return;
+      }
+      if (data.hubUrl && data.apiKey) {
+        this.hubUrl = data.hubUrl;
+        this.apiKey = data.apiKey;
+        this.initWebSocket();
+      } else {
+        console.warn("Hub not configured:", data.error);
+      }
+    } catch (e) {
+      console.error("Hub config error:", e);
+    }
   }
 
   private initWebSocket() {
+    if (!this.hubUrl || !this.apiKey) return;
     if (this.ws?.readyState === WebSocket.OPEN) return;
 
     try {
-      const wsUrl = HUB_URL.replace(/^http/, "ws");
       this.ws = new WebSocket(
-        `${wsUrl}?role=agent&agentId=${this.agentId}&apiKey=${HUB_API_KEY}`
+        `${this.hubUrl}?role=agent&agentId=${this.agentId}&apiKey=${this.apiKey}`
       );
 
       this.ws.onmessage = (event) => {
@@ -91,23 +106,21 @@ class HubService {
     cancelReason?: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      const res = await fetch(`${HUB_URL}/api/orders/${hubOrderId}/status`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": HUB_API_KEY,
-        },
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke("hub-update-status", {
+        body: {
+          hubOrderId,
           status,
           agentId: this.agentId,
           agentName: this.agentName,
-          ...(cancelReason && { cancelReason }),
-        }),
+          cancelReason,
+        },
       });
 
-      if (!res.ok) {
-        const err = await res.text();
-        return { success: false, error: err };
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      if (data.error) {
+        return { success: false, error: data.error };
       }
       return { success: true };
     } catch (e) {
