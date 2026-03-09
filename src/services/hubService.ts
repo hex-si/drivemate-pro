@@ -41,6 +41,8 @@ class HubService {
   private connecting = false;
   private connected = false;
   private _currentStatus: "online" | "offline" | "busy" = "offline";
+  private _pendingStatus: "online" | "offline" | "busy" | null = null;
+  private _statusRetryTimer: ReturnType<typeof setTimeout> | null = null;
 
   get isConnected() {
     return this.connected;
@@ -85,8 +87,15 @@ class HubService {
       this.ws.onopen = () => {
         this.connected = true;
         this.reconnectAttempts = 0;
-        // Send current availability status to hub on connect
-        this.sendAvailability(this._currentStatus);
+        console.log("[HubService] WebSocket connected");
+        // Send any pending status immediately
+        if (this._pendingStatus !== null) {
+          this._flushStatus(this._pendingStatus);
+          this._pendingStatus = null;
+        } else {
+          // Send current availability status to hub on connect
+          this._flushStatus(this._currentStatus);
+        }
       };
 
       this.ws.onmessage = (event) => {
@@ -119,10 +128,9 @@ class HubService {
   }
 
   /**
-   * Send availability status to hub via WebSocket
+   * Internal: actually send status over WebSocket
    */
-  sendAvailability(status: "online" | "offline" | "busy") {
-    this._currentStatus = status;
+  private _flushStatus(status: "online" | "offline" | "busy") {
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(
         JSON.stringify({
@@ -132,15 +140,49 @@ class HubService {
           status,
         })
       );
+      console.log("[HubService] Status sent to hub:", status);
+      return true;
     }
+    return false;
+  }
+
+  /**
+   * Send availability status to hub via WebSocket.
+   * Queues the status if WS isn't open yet and retries.
+   */
+  sendAvailability(status: "online" | "offline" | "busy") {
+    this._currentStatus = status;
+
+    // Clear any pending retry
+    if (this._statusRetryTimer) {
+      clearTimeout(this._statusRetryTimer);
+      this._statusRetryTimer = null;
+    }
+
+    // Try to send immediately
+    if (this._flushStatus(status)) return;
+
+    // WS not open — queue for when it opens + retry after 2s
+    this._pendingStatus = status;
+    console.log("[HubService] WS not open, queued status:", status);
+    this._statusRetryTimer = setTimeout(() => {
+      if (this._pendingStatus !== null) {
+        if (this._flushStatus(this._pendingStatus)) {
+          this._pendingStatus = null;
+        }
+      }
+    }, 2000);
   }
 
   disconnect() {
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.reconnectTimer = null;
+    if (this._statusRetryTimer) clearTimeout(this._statusRetryTimer);
+    this._statusRetryTimer = null;
+    this._pendingStatus = null;
     this.reconnectAttempts = this.maxReconnectAttempts; // prevent reconnect
     // Notify hub we're going offline before disconnecting
-    this.sendAvailability("offline");
+    this._flushStatus("offline");
     this.ws?.close();
     this.ws = null;
     this.connected = false;
