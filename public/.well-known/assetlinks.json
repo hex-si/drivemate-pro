@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "site.discoverukhrul.agent.twa",
+        "sha256_cert_fingerprints": ["06:7B:B2:06:12:74:AA:EB:06:A0:EE:D2:E2:41:45:99:93:08:03:83:B7:BA:67:7B:9B:79:16:D2:BE:35:BE:D8"]
+      }
+    }]
