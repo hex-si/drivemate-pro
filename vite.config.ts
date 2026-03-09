@@ -50,7 +50,7 @@ export default defineConfig(({ mode }) => ({
         ]
       },
       workbox: {
-        navigateFallback: '/offline.html',
+        navigateFallback: null,
         navigateFallbackDenylist: [/^\/~oauth/],
         runtimeCaching: [
           {
