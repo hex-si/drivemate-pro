@@ -12,6 +12,7 @@ import CompleteDeliveryPage from "@/pages/agent/CompleteDeliveryPage";
 import EarningsPage from "@/pages/agent/EarningsPage";
 import ProfilePage from "@/pages/agent/ProfilePage";
 import NotificationsPage from "@/pages/agent/NotificationsPage";
+import ReceiptPage from "@/pages/agent/ReceiptPage";
 import LoginPage from "@/pages/auth/LoginPage";
 import InstallPage from "@/pages/InstallPage";
 import NotFound from "./pages/NotFound";
@@ -65,6 +66,7 @@ const App = () => (
               <Route path="earnings" element={<EarningsPage />} />
               <Route path="profile" element={<ProfilePage />} />
               <Route path="notifications" element={<NotificationsPage />} />
+              <Route path="receipt/:orderId" element={<ReceiptPage />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

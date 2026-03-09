@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { Camera, Bike, Car, Footprints, Star, Package, DollarSign, Calendar, Save, Loader2 } from "lucide-react";
+import { Camera, Bike, Car, Footprints, Star, Package, DollarSign, Calendar, Save, Loader2, Download } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { format } from "date-fns";
+import { useInstallPrompt } from "@/hooks/useInstallPrompt";
 
 type Vehicle = "bike" | "car" | "foot";
 
@@ -22,6 +22,7 @@ export default function ProfilePage() {
   const [email, setEmail] = useState("");
   const [vehicle, setVehicle] = useState<Vehicle>("bike");
   const [saving, setSaving] = useState(false);
+  const { canInstall, install } = useInstallPrompt();
 
   useEffect(() => {
     if (agent) {
@@ -122,15 +123,28 @@ export default function ProfilePage() {
       </div>
 
       {/* Save */}
-      <motion.button
-        whileTap={{ scale: 0.97 }}
-        onClick={handleSave}
-        disabled={saving}
-        className="w-full py-4 rounded-2xl bg-primary text-primary-foreground text-base font-bold flex items-center justify-center gap-2 disabled:opacity-50"
-      >
-        {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-        Save Changes
-      </motion.button>
+      <div className="space-y-3">
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={handleSave}
+          disabled={saving}
+          className="w-full py-4 rounded-2xl bg-primary text-primary-foreground text-base font-bold flex items-center justify-center gap-2 disabled:opacity-50"
+        >
+          {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+          Save Changes
+        </motion.button>
+
+        {canInstall && (
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={install}
+            className="w-full py-4 rounded-2xl glass text-foreground text-base font-bold flex items-center justify-center gap-2"
+          >
+            <Download className="w-5 h-5 text-primary" />
+            Install App
+          </motion.button>
+        )}
+      </div>
     </div>
   );
 }
