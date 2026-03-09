@@ -1,24 +1,26 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { Package, Calendar, DollarSign, Star } from "lucide-react";
+import { Package, Calendar, DollarSign, Star, CreditCard, CheckCircle2 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { subDays, subWeeks, startOfWeek, endOfWeek, format } from "date-fns";
+import { subDays, subWeeks, startOfWeek, endOfWeek, format, formatDistanceToNow } from "date-fns";
 
 type Period = "daily" | "weekly" | "monthly";
 
 export default function EarningsPage() {
-  const { agent } = useAuth();
+  const { agent, user } = useAuth();
   const [period, setPeriod] = useState<Period>("daily");
   const [deliveredOrders, setDeliveredOrders] = useState<any[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<"earnings" | "payments">("earnings");
 
   useEffect(() => {
     if (!agent) return;
-    const fetch = async () => {
+    const fetchOrders = async () => {
       const { data } = await supabase
         .from("delivery_orders")
         .select("*")
@@ -27,8 +29,23 @@ export default function EarningsPage() {
         .order("updated_at", { ascending: false });
       if (data) setDeliveredOrders(data);
     };
-    fetch();
+    fetchOrders();
   }, [agent]);
+
+  useEffect(() => {
+    if (!user) return;
+    const fetchPayments = async () => {
+      const { data } = await supabase
+        .from("notifications")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("type", "earnings")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (data) setPayments(data);
+    };
+    fetchPayments();
+  }, [user]);
 
   const lifetime = deliveredOrders.reduce((s, o) => s + (o.total_fee || 0), 0);
 
@@ -152,27 +169,92 @@ export default function EarningsPage() {
         <StatCard icon={Star} label="Rating" value={`${agent?.average_rating || 0} ⭐`} />
       </div>
 
-      {/* History */}
+      {/* Tabbed History */}
       <div>
-        <p className="text-sm font-semibold text-foreground mb-3">Earnings History</p>
-        <div className="space-y-2">
-          {deliveredOrders.length === 0 && (
-            <div className="glass rounded-xl p-6 text-center">
-              <p className="text-sm text-muted-foreground">No delivered orders yet</p>
-            </div>
-          )}
-          {deliveredOrders.slice(0, 10).map((o) => (
-            <div key={o.id} className="glass rounded-xl p-3 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-foreground">{o.order_code}</p>
-                <p className="text-xs text-muted-foreground">
-                  {format(new Date(o.updated_at), "MMM d")} · {o.delivery_address}
-                </p>
-              </div>
-              <span className="text-sm font-bold text-accent">₵{(o.total_fee || 0).toFixed(2)}</span>
-            </div>
-          ))}
+        <div className="flex gap-1 mb-3">
+          <button
+            onClick={() => setActiveTab("earnings")}
+            className={cn(
+              "px-4 py-1.5 rounded-lg text-xs font-semibold transition-all",
+              activeTab === "earnings" ? "bg-primary text-primary-foreground" : "glass text-muted-foreground"
+            )}
+          >
+            Delivery Earnings
+          </button>
+          <button
+            onClick={() => setActiveTab("payments")}
+            className={cn(
+              "px-4 py-1.5 rounded-lg text-xs font-semibold transition-all",
+              activeTab === "payments" ? "bg-primary text-primary-foreground" : "glass text-muted-foreground"
+            )}
+          >
+            Confirmed Payments
+          </button>
         </div>
+
+        <motion.div key={activeTab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="space-y-2">
+          {activeTab === "earnings" && (
+            <>
+              {deliveredOrders.length === 0 && (
+                <div className="glass rounded-xl p-6 text-center">
+                  <p className="text-sm text-muted-foreground">No delivered orders yet</p>
+                </div>
+              )}
+              {deliveredOrders.slice(0, 20).map((o) => (
+                <div key={o.id} className="glass rounded-xl p-3 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-accent/15 flex items-center justify-center shrink-0">
+                      <Package className="w-4 h-4 text-accent" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{o.order_code}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {format(new Date(o.updated_at), "MMM d, yyyy")} · {o.delivery_address?.slice(0, 30)}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-sm font-bold text-accent">₵{(o.total_fee || 0).toFixed(2)}</span>
+                </div>
+              ))}
+            </>
+          )}
+
+          {activeTab === "payments" && (
+            <>
+              {payments.length === 0 && (
+                <div className="glass rounded-xl p-6 text-center">
+                  <CreditCard className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">No confirmed payments yet</p>
+                </div>
+              )}
+              {payments.map((p) => {
+                const meta = (p.metadata as any) || {};
+                const timeAgo = formatDistanceToNow(new Date(p.created_at), { addSuffix: true });
+                return (
+                  <div key={p.id} className="glass rounded-xl p-3 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
+                        <CheckCircle2 className="w-4 h-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          {meta.order_code || "Payment"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {timeAgo}{meta.customer_name ? ` · ${meta.customer_name}` : ""}
+                          {meta.payment_method ? ` · ${meta.payment_method}` : ""}
+                        </p>
+                      </div>
+                    </div>
+                    {meta.amount != null && (
+                      <span className="text-sm font-bold text-accent">₦{Number(meta.amount).toFixed(2)}</span>
+                    )}
+                  </div>
+                );
+              })}
+            </>
+          )}
+        </motion.div>
       </div>
     </div>
   );
