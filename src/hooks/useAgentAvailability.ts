@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { hubService } from "@/services/hubService";
 
 type Status = "online" | "offline" | "busy";
 
@@ -22,7 +23,10 @@ export function useAgentAvailability() {
         .maybeSingle();
 
       if (data) {
-        setStatus(data.status as Status);
+        const dbStatus = data.status as Status;
+        setStatus(dbStatus);
+        // Sync to hub on load
+        hubService.sendAvailability(dbStatus);
       }
       setLoading(false);
     };
@@ -46,6 +50,8 @@ export function useAgentAvailability() {
         .update({ last_seen: new Date().toISOString() })
         .eq("user_id", user.id)
         .then(() => {});
+      // Also keep hub alive
+      hubService.sendAvailability(status);
     };
 
     // Immediate heartbeat then every 30s
@@ -59,6 +65,17 @@ export function useAgentAvailability() {
       }
     };
   }, [user, status]);
+
+  // Listen for page visibility changes to resync on foreground
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible" && status !== "offline") {
+        hubService.sendAvailability(status);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [status]);
 
   const changeStatus = useCallback(
     async (newStatus: Status) => {
@@ -79,6 +96,8 @@ export function useAgentAvailability() {
 
       if (!error) {
         setStatus(newStatus);
+        // Push to hub immediately
+        hubService.sendAvailability(newStatus);
       }
     },
     [user, agent]

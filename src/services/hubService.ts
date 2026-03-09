@@ -37,9 +37,14 @@ class HubService {
   private hubUrl: string | null = null;
   private apiKey: string | null = null;
   private reconnectAttempts = 0;
-  private maxReconnectAttempts = 5;
+  private maxReconnectAttempts = 10;
   private connecting = false;
   private connected = false;
+  private _currentStatus: "online" | "offline" | "busy" = "offline";
+
+  get isConnected() {
+    return this.connected;
+  }
 
   async connect(agentId: string, agentName: string) {
     // Prevent duplicate connections
@@ -80,6 +85,8 @@ class HubService {
       this.ws.onopen = () => {
         this.connected = true;
         this.reconnectAttempts = 0;
+        // Send current availability status to hub on connect
+        this.sendAvailability(this._currentStatus);
       };
 
       this.ws.onmessage = (event) => {
@@ -96,7 +103,8 @@ class HubService {
       this.ws.onclose = () => {
         this.connected = false;
         this.reconnectAttempts++;
-        if (this.reconnectAttempts < this.maxReconnectAttempts) {
+        // Only reconnect if agent is online/busy (not manually offline)
+        if (this._currentStatus !== "offline" && this.reconnectAttempts < this.maxReconnectAttempts) {
           const delay = Math.min(5000 * Math.pow(2, this.reconnectAttempts - 1), 30000);
           this.reconnectTimer = setTimeout(() => this.initWebSocket(), delay);
         }
@@ -110,10 +118,29 @@ class HubService {
     }
   }
 
+  /**
+   * Send availability status to hub via WebSocket
+   */
+  sendAvailability(status: "online" | "offline" | "busy") {
+    this._currentStatus = status;
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(
+        JSON.stringify({
+          type: "agent_status",
+          agentId: this.agentId,
+          agentName: this.agentName,
+          status,
+        })
+      );
+    }
+  }
+
   disconnect() {
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.reconnectTimer = null;
     this.reconnectAttempts = this.maxReconnectAttempts; // prevent reconnect
+    // Notify hub we're going offline before disconnecting
+    this.sendAvailability("offline");
     this.ws?.close();
     this.ws = null;
     this.connected = false;
