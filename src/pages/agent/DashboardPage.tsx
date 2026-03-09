@@ -192,20 +192,28 @@ function QuickAction({
   highlight?: boolean;
   onClick?: () => void;
 }) {
-  const Comp = onClick ? "button" : Link;
-  const props = onClick ? { onClick } : { to };
+  const classes = cn(
+    "flex flex-col items-center gap-1.5 p-3 rounded-2xl transition-all active:scale-95",
+    highlight ? "bg-primary/15 border border-primary/30" : "glass"
+  );
+
+  if (onClick) {
+    return (
+      <button onClick={onClick} className={classes}>
+        <Icon className={cn("w-5 h-5", highlight ? "text-primary" : "text-muted-foreground")} />
+        <span className={cn("text-[10px] font-medium", highlight ? "text-primary" : "text-muted-foreground")}>
+          {label}
+        </span>
+      </button>
+    );
+  }
+
   return (
-    <Comp
-      {...(props as any)}
-      className={cn(
-        "flex flex-col items-center gap-1.5 p-3 rounded-2xl transition-all active:scale-95",
-        highlight ? "bg-primary/15 border border-primary/30" : "glass"
-      )}
-    >
+    <Link to={to} className={classes}>
       <Icon className={cn("w-5 h-5", highlight ? "text-primary" : "text-muted-foreground")} />
       <span className={cn("text-[10px] font-medium", highlight ? "text-primary" : "text-muted-foreground")}>
         {label}
       </span>
-    </Comp>
+    </Link>
   );
 }
