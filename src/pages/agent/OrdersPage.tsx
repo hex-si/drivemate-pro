@@ -1,16 +1,18 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { Package, MapPin, Clock, XCircle, CheckCircle, Truck, ArrowRight, Store } from "lucide-react";
+import { Package, MapPin, Clock, XCircle, CheckCircle, Truck, ArrowRight, Store, Eye } from "lucide-react";
 import { useHubOrders } from "@/hooks/useHubOrders";
 import type { HubOrder } from "@/services/hubService";
 import { useToast } from "@/hooks/use-toast";
+import OrderDetailSheet from "@/components/orders/OrderDetailSheet";
 
 type Tab = "active" | "completed";
 
 export default function OrdersPage() {
   const { orders, hubConnected, updateStatus } = useHubOrders();
   const [activeTab, setActiveTab] = useState<Tab>("active");
+  const [selectedOrder, setSelectedOrder] = useState<HubOrder | null>(null);
   const { toast } = useToast();
 
   const activeOrders = orders.filter(
@@ -87,10 +89,12 @@ export default function OrdersPage() {
             </div>
           )}
           {filtered.map((order) => (
-            <OrderCard key={order.id} order={order} onStatusUpdate={handleStatusUpdate} />
+            <OrderCard key={order.id} order={order} onStatusUpdate={handleStatusUpdate} onViewDetails={setSelectedOrder} />
           ))}
         </motion.div>
       </AnimatePresence>
+
+      <OrderDetailSheet order={selectedOrder} open={!!selectedOrder} onOpenChange={(o) => !o && setSelectedOrder(null)} />
     </div>
   );
 }
@@ -98,9 +102,11 @@ export default function OrdersPage() {
 function OrderCard({
   order,
   onStatusUpdate,
+  onViewDetails,
 }: {
   order: HubOrder;
   onStatusUpdate: (order: HubOrder, status: string, reason?: string) => void;
+  onViewDetails: (order: HubOrder) => void;
 }) {
   const [showCancel, setShowCancel] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
@@ -165,12 +171,18 @@ function OrderCard({
         </div>
       )}
 
-      {/* Total + Fee */}
+      {/* Total + Fee + View */}
       <div className="flex items-center justify-between border-t border-border pt-3">
         <div>
           <p className="text-xs text-muted-foreground">Order Total</p>
           <p className="text-lg font-bold text-foreground">₵{order.total.toFixed(2)}</p>
         </div>
+        <button
+          onClick={() => onViewDetails(order)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-bold active:scale-95 transition-transform"
+        >
+          <Eye className="w-3.5 h-3.5" /> Details
+        </button>
         <div className="text-right">
           <p className="text-xs text-muted-foreground">Your Fee</p>
           <p className="text-lg font-bold text-accent">₵{order.fee.toFixed(2)}</p>

@@ -170,6 +170,7 @@ export type Database = {
           pickup_address: string
           pickup_lat: number | null
           pickup_lng: number | null
+          plus_code: string | null
           proof_photo_url: string | null
           special_instructions: string | null
           status: Database["public"]["Enums"]["order_status"]
@@ -200,6 +201,7 @@ export type Database = {
           pickup_address: string
           pickup_lat?: number | null
           pickup_lng?: number | null
+          plus_code?: string | null
           proof_photo_url?: string | null
           special_instructions?: string | null
           status?: Database["public"]["Enums"]["order_status"]
@@ -230,6 +232,7 @@ export type Database = {
           pickup_address?: string
           pickup_lat?: number | null
           pickup_lng?: number | null
+          plus_code?: string | null
           proof_photo_url?: string | null
           special_instructions?: string | null
           status?: Database["public"]["Enums"]["order_status"]
