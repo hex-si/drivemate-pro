@@ -61,7 +61,7 @@ export default function DashboardPage() {
             <p className="text-xs text-muted-foreground">ID: {agent.agent_code}</p>
           )}
         </div>
-        <AvailabilityToggle status={status} onStatusChange={setStatus} />
+        <AvailabilityToggle status={status} onStatusChange={changeStatus} />
       </motion.div>
 
 
