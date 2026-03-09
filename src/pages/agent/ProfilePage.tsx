@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Camera, Bike, Car, Footprints, Star, Package, DollarSign, Calendar, Save, Loader2, Download } from "lucide-react";
@@ -23,6 +23,9 @@ export default function ProfilePage() {
   const [email, setEmail] = useState("");
   const [vehicle, setVehicle] = useState<Vehicle>("bike");
   const [saving, setSaving] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { canInstall, install } = useInstallPrompt();
 
   useEffect(() => {
@@ -31,8 +34,52 @@ export default function ProfilePage() {
       setPhone(agent.phone || "");
       setEmail(agent.email || "");
       setVehicle((agent.vehicle as Vehicle) || "bike");
+      setAvatarUrl(agent.avatar_url || null);
     }
   }, [agent]);
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !agent) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image must be under 5MB");
+      return;
+    }
+
+    setUploading(true);
+    const ext = file.name.split(".").pop();
+    const filePath = `${agent.user_id}/avatar.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("avatars")
+      .upload(filePath, file, { upsert: true });
+
+    if (uploadError) {
+      toast.error("Failed to upload image");
+      setUploading(false);
+      return;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from("avatars")
+      .getPublicUrl(filePath);
+
+    const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+
+    await supabase
+      .from("delivery_agents")
+      .update({ avatar_url: publicUrl })
+      .eq("user_id", agent.user_id);
+
+    setAvatarUrl(publicUrl);
+    setUploading(false);
+    toast.success("Profile photo updated!");
+  };
 
   const handleSave = async () => {
     if (!agent) return;
@@ -58,11 +105,34 @@ export default function ProfilePage() {
       {/* Header */}
       <div className="flex flex-col items-center text-center space-y-3">
         <div className="relative">
-          <div className="w-20 h-20 rounded-2xl bg-secondary flex items-center justify-center text-3xl font-bold text-primary">
-            {(agent?.full_name?.[0] || "A").toUpperCase()}
-          </div>
-          <button className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-primary flex items-center justify-center active:scale-90 transition-transform">
-            <Camera className="w-3.5 h-3.5 text-primary-foreground" />
+          {avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt="Profile"
+              className="w-20 h-20 rounded-2xl object-cover"
+            />
+          ) : (
+            <div className="w-20 h-20 rounded-2xl bg-secondary flex items-center justify-center text-3xl font-bold text-primary">
+              {(agent?.full_name?.[0] || "A").toUpperCase()}
+            </div>
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleAvatarUpload}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-primary flex items-center justify-center active:scale-90 transition-transform disabled:opacity-50"
+          >
+            {uploading ? (
+              <Loader2 className="w-3.5 h-3.5 text-primary-foreground animate-spin" />
+            ) : (
+              <Camera className="w-3.5 h-3.5 text-primary-foreground" />
+            )}
           </button>
         </div>
         <div>
