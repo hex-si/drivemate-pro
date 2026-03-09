@@ -91,7 +91,7 @@ export default function DashboardPage() {
             icon={Zap}
             label="Go Online"
             highlight={status === "offline"}
-            onClick={() => setStatus("online")}
+            onClick={() => changeStatus("online")}
           />
         </div>
       </motion.div>
