@@ -23,26 +23,26 @@ export default defineConfig(({ mode }) => ({
         name: 'DeliverPro',
         short_name: 'DeliverPro',
         description: 'Delivery agent app for managing orders, deliveries, and earnings',
-        theme_color: '#0A0A0F',
+        theme_color: '#00C851',
         background_color: '#0A0A0F',
         display: 'standalone',
         orientation: 'portrait',
         start_url: '/agent/dashboard',
         icons: [
           {
-            src: '/favicon.ico',
-            sizes: '64x64',
-            type: 'image/x-icon'
-          },
-          {
-            src: '/favicon.ico',
-            sizes: '192x192',
-            type: 'image/x-icon'
-          },
-          {
-            src: '/favicon.ico',
+            src: '/favicon.png',
             sizes: '512x512',
-            type: 'image/x-icon',
+            type: 'image/png'
+          },
+          {
+            src: '/icon-512.png',
+            sizes: '512x512',
+            type: 'image/png'
+          },
+          {
+            src: '/icon-512.png',
+            sizes: '512x512',
+            type: 'image/png',
             purpose: 'maskable'
           }
         ]
