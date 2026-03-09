@@ -11,7 +11,7 @@ import AvailabilityToggle from "@/components/dashboard/AvailabilityToggle";
 import ActiveDeliveryCard from "@/components/dashboard/ActiveDeliveryCard";
 import IncomingOrderBanner from "@/components/dashboard/IncomingOrderBanner";
 import { useHubOrders } from "@/hooks/useHubOrders";
-
+import HubConnectionBadge from "@/components/dashboard/HubConnectionBadge";
 const container = {
   hidden: { opacity: 0 },
   show: { opacity: 1, transition: { staggerChildren: 0.08 } },
@@ -62,6 +62,11 @@ export default function DashboardPage() {
           )}
         </div>
         <AvailabilityToggle status={status} onStatusChange={changeStatus} />
+      </motion.div>
+
+      {/* Hub Connection Status */}
+      <motion.div variants={item} className="flex justify-center">
+        <HubConnectionBadge />
       </motion.div>
 
 
