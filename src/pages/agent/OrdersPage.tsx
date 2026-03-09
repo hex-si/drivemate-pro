@@ -36,17 +36,6 @@ export default function OrdersPage() {
     <div className="px-4 py-4 space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-foreground">My Orders</h1>
-        {!hubConnected && (
-          <span className="text-xs text-accent bg-accent/15 px-2 py-1 rounded-full font-medium">
-            Offline mode
-          </span>
-        )}
-        {hubConnected && (
-          <span className="text-xs text-primary bg-primary/15 px-2 py-1 rounded-full font-medium flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-            Live
-          </span>
-        )}
       </div>
 
       {/* Tabs */}

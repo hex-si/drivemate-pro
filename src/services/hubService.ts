@@ -36,38 +36,51 @@ class HubService {
   private agentName: string = "";
   private hubUrl: string | null = null;
   private apiKey: string | null = null;
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 5;
+  private connecting = false;
+  private connected = false;
 
   async connect(agentId: string, agentName: string) {
+    // Prevent duplicate connections
+    if (this.connecting || this.connected) return;
+    this.connecting = true;
     this.agentId = agentId;
     this.agentName = agentName;
     
-    // Fetch hub config from edge function
     try {
       const { data, error } = await supabase.functions.invoke("hub-config");
       if (error) {
-        console.error("Failed to get hub config:", error);
+        console.warn("Hub config unavailable");
+        this.connecting = false;
         return;
       }
-      if (data.hubUrl && data.apiKey) {
+      if (data?.hubUrl && data?.apiKey) {
         this.hubUrl = data.hubUrl;
         this.apiKey = data.apiKey;
+        this.reconnectAttempts = 0;
         this.initWebSocket();
-      } else {
-        console.warn("Hub not configured:", data.error);
       }
-    } catch (e) {
-      console.error("Hub config error:", e);
+    } catch {
+      // Hub not available — app works fine without it
     }
+    this.connecting = false;
   }
 
   private initWebSocket() {
     if (!this.hubUrl || !this.apiKey) return;
     if (this.ws?.readyState === WebSocket.OPEN) return;
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) return;
 
     try {
       this.ws = new WebSocket(
         `${this.hubUrl}?role=agent&agentId=${this.agentId}&apiKey=${this.apiKey}`
       );
+
+      this.ws.onopen = () => {
+        this.connected = true;
+        this.reconnectAttempts = 0;
+      };
 
       this.ws.onmessage = (event) => {
         try {
@@ -75,27 +88,36 @@ class HubService {
           if (data.type === "orders_update" && data.orders) {
             this.listeners.forEach((fn) => fn(data.orders));
           }
-        } catch (e) {
-          console.error("Hub WS parse error:", e);
+        } catch {
+          // ignore parse errors
         }
       };
 
       this.ws.onclose = () => {
-        this.reconnectTimer = setTimeout(() => this.initWebSocket(), 5000);
+        this.connected = false;
+        this.reconnectAttempts++;
+        if (this.reconnectAttempts < this.maxReconnectAttempts) {
+          const delay = Math.min(5000 * Math.pow(2, this.reconnectAttempts - 1), 30000);
+          this.reconnectTimer = setTimeout(() => this.initWebSocket(), delay);
+        }
       };
 
-      this.ws.onerror = (e) => {
-        console.error("Hub WS error:", e);
+      this.ws.onerror = () => {
+        // Silently handle — onclose will fire next and handle reconnect
       };
-    } catch (e) {
-      console.error("Hub WS connection failed:", e);
+    } catch {
+      // Connection failed silently
     }
   }
 
   disconnect() {
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
+    this.reconnectAttempts = this.maxReconnectAttempts; // prevent reconnect
     this.ws?.close();
     this.ws = null;
+    this.connected = false;
+    this.connecting = false;
   }
 
   onOrdersUpdate(handler: HubEventHandler) {
@@ -119,12 +141,8 @@ class HubService {
         },
       });
 
-      if (error) {
-        return { success: false, error: error.message };
-      }
-      if (data.error) {
-        return { success: false, error: data.error };
-      }
+      if (error) return { success: false, error: error.message };
+      if (data?.error) return { success: false, error: data.error };
       return { success: true };
     } catch (e) {
       return { success: false, error: (e as Error).message };
