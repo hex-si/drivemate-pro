@@ -5,6 +5,7 @@ import { Camera, Bike, Car, Footprints, Star, Package, DollarSign, Calendar, Sav
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { format } from "date-fns";
 import { useInstallPrompt } from "@/hooks/useInstallPrompt";
 
 type Vehicle = "bike" | "car" | "foot";
