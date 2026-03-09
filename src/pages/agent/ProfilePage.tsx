@@ -145,6 +145,15 @@ export default function ProfilePage() {
             Install App
           </motion.button>
         )}
+
+        <a
+          href="/DeliverPro.apk"
+          download="DeliverPro.apk"
+          className="w-full py-4 rounded-2xl glass text-foreground text-base font-bold flex items-center justify-center gap-2 active:scale-[0.97] transition-transform"
+        >
+          <Download className="w-5 h-5 text-primary" />
+          Download Android APK
+        </a>
       </div>
     </div>
   );

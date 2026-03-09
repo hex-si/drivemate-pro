@@ -90,6 +90,28 @@ export default function InstallPage() {
             <div className="space-y-6">
               <h2 className="text-2xl font-semibold text-foreground">Android Instructions</h2>
 
+              {/* APK Download */}
+              <a
+                href="/DeliverPro.apk"
+                download="DeliverPro.apk"
+                className="flex items-center gap-4 p-5 rounded-2xl bg-primary/10 border border-primary/30 active:scale-[0.98] transition-transform"
+              >
+                <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center shrink-0">
+                  <Smartphone className="w-6 h-6 text-primary-foreground" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-bold text-foreground">Download APK</p>
+                  <p className="text-sm text-muted-foreground">Install directly on your Android device</p>
+                </div>
+                <Download className="w-5 h-5 text-primary" />
+              </a>
+
+              <div className="flex items-center gap-3 text-muted-foreground text-sm">
+                <div className="flex-1 h-px bg-border" />
+                <span>or install from browser</span>
+                <div className="flex-1 h-px bg-border" />
+              </div>
+
               <div className="space-y-4">
                 <div className="bg-secondary/50 rounded-2xl p-6 space-y-3 border border-border">
                   <div className="flex items-start gap-3">
