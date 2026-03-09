@@ -95,8 +95,10 @@ export function useIncomingOrder() {
       }
     });
 
-    return unsubscribe;
-  }, [agent, startCountdown]);
+    return () => {
+      unsubscribe();
+    };
+  }, [agent, startCountdown, incoming]);
 
   // Listen to Supabase realtime for new delivery_orders assigned to this agent
   useEffect(() => {
