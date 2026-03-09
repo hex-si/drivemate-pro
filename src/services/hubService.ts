@@ -43,9 +43,22 @@ class HubService {
   private _currentStatus: "online" | "offline" | "busy" = "offline";
   private _pendingStatus: "online" | "offline" | "busy" | null = null;
   private _statusRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  private _connectionListeners: Set<(connected: boolean) => void> = new Set();
 
   get isConnected() {
     return this.connected;
+  }
+
+  private _setConnected(val: boolean) {
+    if (this.connected !== val) {
+      this.connected = val;
+      this._connectionListeners.forEach((fn) => fn(val));
+    }
+  }
+
+  onConnectionChange(handler: (connected: boolean) => void) {
+    this._connectionListeners.add(handler);
+    return () => this._connectionListeners.delete(handler);
   }
 
   async connect(agentId: string, agentName: string) {
@@ -85,7 +98,7 @@ class HubService {
       );
 
       this.ws.onopen = () => {
-        this.connected = true;
+        this._setConnected(true);
         this.reconnectAttempts = 0;
         console.log("[HubService] WebSocket connected");
         // Send any pending status immediately
@@ -110,7 +123,7 @@ class HubService {
       };
 
       this.ws.onclose = () => {
-        this.connected = false;
+        this._setConnected(false);
         this.reconnectAttempts++;
         // Only reconnect if agent is online/busy (not manually offline)
         if (this._currentStatus !== "offline" && this.reconnectAttempts < this.maxReconnectAttempts) {
@@ -185,7 +198,7 @@ class HubService {
     this._flushStatus("offline");
     this.ws?.close();
     this.ws = null;
-    this.connected = false;
+    this._setConnected(false);
     this.connecting = false;
   }
 
