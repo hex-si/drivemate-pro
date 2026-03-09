@@ -1,57 +1,100 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { Package, Calendar, DollarSign, Star, TrendingUp } from "lucide-react";
+import { Package, Calendar, DollarSign, Star } from "lucide-react";
 import {
-  BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { subDays, subWeeks, startOfWeek, endOfWeek, format } from "date-fns";
 
 type Period = "daily" | "weekly" | "monthly";
 
-const dailyData = Array.from({ length: 14 }, (_, i) => ({
-  label: `${14 - i}d`,
-  value: Math.floor(Math.random() * 80 + 20),
-}));
-const weeklyData = Array.from({ length: 8 }, (_, i) => ({
-  label: `W${8 - i}`,
-  value: Math.floor(Math.random() * 400 + 100),
-}));
-const monthlyData = Array.from({ length: 12 }, (_, i) => ({
-  label: ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][i],
-  value: Math.floor(Math.random() * 1500 + 300),
-}));
-
-const chartData: Record<Period, typeof dailyData> = {
-  daily: dailyData,
-  weekly: weeklyData,
-  monthly: monthlyData,
-};
-
-const mockHistory = [
-  { id: "ORD-1042", date: "Mar 7", address: "12 Osu Oxford St", fee: 18.50 },
-  { id: "ORD-1041", date: "Mar 7", address: "5 Cantonments Rd", fee: 22.00 },
-  { id: "ORD-1040", date: "Mar 6", address: "8 Dzorwulu Ave", fee: 14.00 },
-  { id: "ORD-1038", date: "Mar 6", address: "3 Labone Link", fee: 30.00 },
-  { id: "ORD-1035", date: "Mar 5", address: "17 Achimota Rd", fee: 25.50 },
-];
-
 export default function EarningsPage() {
+  const { agent } = useAuth();
   const [period, setPeriod] = useState<Period>("daily");
-  const data = chartData[period];
-  const bestDay = data.reduce((max, d) => (d.value > max.value ? d : max), data[0]);
+  const [deliveredOrders, setDeliveredOrders] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!agent) return;
+    const fetch = async () => {
+      const { data } = await supabase
+        .from("delivery_orders")
+        .select("*")
+        .eq("agent_user_id", agent.user_id)
+        .eq("status", "delivered")
+        .order("updated_at", { ascending: false });
+      if (data) setDeliveredOrders(data);
+    };
+    fetch();
+  }, [agent]);
+
+  const lifetime = deliveredOrders.reduce((s, o) => s + (o.total_fee || 0), 0);
+
+  const now = new Date();
+  const weekStart = startOfWeek(now);
+  const weekEarnings = deliveredOrders
+    .filter((o) => new Date(o.updated_at) >= weekStart)
+    .reduce((s, o) => s + (o.total_fee || 0), 0);
+
+  const todayStr = format(now, "yyyy-MM-dd");
+  const todayEarnings = deliveredOrders
+    .filter((o) => o.updated_at?.startsWith(todayStr))
+    .reduce((s, o) => s + (o.total_fee || 0), 0);
+
+  const avgFee = deliveredOrders.length > 0 ? lifetime / deliveredOrders.length : 0;
+
+  const chartData = useMemo(() => {
+    if (period === "daily") {
+      return Array.from({ length: 14 }, (_, i) => {
+        const date = subDays(now, 13 - i);
+        const dateStr = format(date, "yyyy-MM-dd");
+        const value = deliveredOrders
+          .filter((o) => o.updated_at?.startsWith(dateStr))
+          .reduce((s, o) => s + (o.total_fee || 0), 0);
+        return { label: format(date, "d/M"), value };
+      });
+    }
+    if (period === "weekly") {
+      return Array.from({ length: 8 }, (_, i) => {
+        const ws = startOfWeek(subWeeks(now, 7 - i));
+        const we = endOfWeek(ws);
+        const value = deliveredOrders
+          .filter((o) => { const d = new Date(o.updated_at); return d >= ws && d <= we; })
+          .reduce((s, o) => s + (o.total_fee || 0), 0);
+        return { label: `W${i + 1}`, value };
+      });
+    }
+    // monthly - last 12 months
+    return Array.from({ length: 12 }, (_, i) => {
+      const monthDate = new Date(now.getFullYear(), now.getMonth() - 11 + i, 1);
+      const monthStr = format(monthDate, "yyyy-MM");
+      const value = deliveredOrders
+        .filter((o) => o.updated_at?.startsWith(monthStr))
+        .reduce((s, o) => s + (o.total_fee || 0), 0);
+      return { label: format(monthDate, "MMM"), value };
+    });
+  }, [deliveredOrders, period]);
+
+  const bestPeriod = chartData.reduce((max, d) => (d.value > max.value ? d : max), chartData[0]);
+
+  const weekOrderCount = deliveredOrders.filter(
+    (o) => new Date(o.updated_at) >= weekStart
+  ).length;
 
   return (
     <div className="px-4 py-4 space-y-5">
       {/* Hero */}
       <div className="text-center space-y-1">
         <p className="text-sm text-muted-foreground">Lifetime Earnings</p>
-        <h1 className="text-4xl font-bold text-gradient-amber">₵4,285.50</h1>
+        <h1 className="text-4xl font-bold text-gradient-amber">₵{lifetime.toFixed(2)}</h1>
         <div className="flex items-center justify-center gap-3 mt-2">
           <span className="px-3 py-1 rounded-full glass text-xs font-medium text-foreground">
-            This week: <span className="text-accent">₵342.00</span>
+            This week: <span className="text-accent">₵{weekEarnings.toFixed(2)}</span>
           </span>
           <span className="px-3 py-1 rounded-full glass text-xs font-medium text-foreground">
-            Today: <span className="text-accent">₵124.50</span>
+            Today: <span className="text-accent">₵{todayEarnings.toFixed(2)}</span>
           </span>
         </div>
       </div>
@@ -75,27 +118,12 @@ export default function EarningsPage() {
             ))}
           </div>
         </div>
-        <motion.div
-          key={period}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="h-48"
-        >
+        <motion.div key={period} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-48">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data}>
+            <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(240 6% 18%)" />
-              <XAxis
-                dataKey="label"
-                tick={{ fontSize: 10, fill: "hsl(240 5% 55%)" }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                tick={{ fontSize: 10, fill: "hsl(240 5% 55%)" }}
-                axisLine={false}
-                tickLine={false}
-                width={35}
-              />
+              <XAxis dataKey="label" tick={{ fontSize: 10, fill: "hsl(240 5% 55%)" }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 10, fill: "hsl(240 5% 55%)" }} axisLine={false} tickLine={false} width={35} />
               <Tooltip
                 contentStyle={{
                   background: "hsl(240 10% 8%)",
@@ -109,32 +137,39 @@ export default function EarningsPage() {
             </BarChart>
           </ResponsiveContainer>
         </motion.div>
-        <p className="text-[10px] text-muted-foreground text-center">
-          Best: <span className="text-accent font-medium">{bestDay.label}</span> — ₵{bestDay.value}
-        </p>
+        {bestPeriod && bestPeriod.value > 0 && (
+          <p className="text-[10px] text-muted-foreground text-center">
+            Best: <span className="text-accent font-medium">{bestPeriod.label}</span> — ₵{bestPeriod.value.toFixed(2)}
+          </p>
+        )}
       </div>
 
       {/* Summary Stats */}
       <div className="grid grid-cols-2 gap-3">
-        <StatCard icon={Package} label="Total Deliveries" value="186" />
-        <StatCard icon={Calendar} label="This Week" value="12" />
-        <StatCard icon={DollarSign} label="Avg Fee" value="₵23.04" />
-        <StatCard icon={Star} label="Rating" value="4.8 ⭐" />
+        <StatCard icon={Package} label="Total Deliveries" value={String(deliveredOrders.length)} />
+        <StatCard icon={Calendar} label="This Week" value={String(weekOrderCount)} />
+        <StatCard icon={DollarSign} label="Avg Fee" value={`₵${avgFee.toFixed(2)}`} />
+        <StatCard icon={Star} label="Rating" value={`${agent?.average_rating || 0} ⭐`} />
       </div>
 
       {/* History */}
       <div>
         <p className="text-sm font-semibold text-foreground mb-3">Earnings History</p>
         <div className="space-y-2">
-          {mockHistory.map((item) => (
-            <div key={item.id} className="glass rounded-xl p-3 flex items-center justify-between">
+          {deliveredOrders.length === 0 && (
+            <div className="glass rounded-xl p-6 text-center">
+              <p className="text-sm text-muted-foreground">No delivered orders yet</p>
+            </div>
+          )}
+          {deliveredOrders.slice(0, 10).map((o) => (
+            <div key={o.id} className="glass rounded-xl p-3 flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-foreground">{item.id}</p>
+                <p className="text-sm font-medium text-foreground">{o.order_code}</p>
                 <p className="text-xs text-muted-foreground">
-                  {item.date} · {item.address}
+                  {format(new Date(o.updated_at), "MMM d")} · {o.delivery_address}
                 </p>
               </div>
-              <span className="text-sm font-bold text-accent">₵{item.fee.toFixed(2)}</span>
+              <span className="text-sm font-bold text-accent">₵{(o.total_fee || 0).toFixed(2)}</span>
             </div>
           ))}
         </div>

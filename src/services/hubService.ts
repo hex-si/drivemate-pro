@@ -11,7 +11,10 @@ export interface HubOrder {
   id: string;
   hubOrderId: string;
   customerName: string;
+  customerPhone?: string;
+  pickupAddress?: string;
   deliveryAddress: string;
+  specialInstructions?: string;
   items: { name: string; quantity: number; price: number }[];
   total: number;
   sourceSite: string;

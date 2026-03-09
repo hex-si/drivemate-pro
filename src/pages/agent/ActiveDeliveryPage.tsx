@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { Check, Navigation, Phone, MessageCircle, FileText, MapPin } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Check, Navigation, Phone, MessageCircle, FileText, MapPin, Loader2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useHubOrders } from "@/hooks/useHubOrders";
+import { useToast } from "@/hooks/use-toast";
 
 const steps = [
   { key: "accepted", label: "Accepted" },
@@ -23,37 +25,84 @@ const nextLabels: Record<string, string> = {
   arrived_delivery: "Complete Delivery",
 };
 
+const hubStatusToStep: Record<string, number> = {
+  assigned: 0,
+  picked_up: 3,
+  on_the_way: 4,
+};
+
 export default function ActiveDeliveryPage() {
-  const [currentStep, setCurrentStep] = useState(3); // picked_up
+  const { orders, updateStatus } = useHubOrders();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [updating, setUpdating] = useState(false);
 
-  const mockOrder = {
-    id: "ORD-1043",
-    pickup: "15 Airport Residential Area",
-    delivery: "22 East Legon Boundary Rd",
-    customer: "Ama Mensah",
-    phone: "+233205551234",
-    notes: "Please call when you arrive. Gate code: 4521. Leave with security if I'm not home.",
-    pickupLat: 5.6037,
-    pickupLng: -0.1870,
-    deliveryLat: 5.6350,
-    deliveryLng: -0.1575,
-  };
+  const order = orders.find(
+    (o) => o.status === "assigned" || o.status === "picked_up" || o.status === "on_the_way"
+  );
 
-  const advanceStep = () => {
-    if (currentStep >= steps.length - 1) return;
-    if (currentStep === steps.length - 2) {
-      // Go to complete delivery
-      window.location.href = "/agent/complete-delivery";
-      return;
+  const [currentStep, setCurrentStep] = useState(0);
+
+  // Sync step from hub status
+  useEffect(() => {
+    if (order) {
+      const hubStep = hubStatusToStep[order.status] ?? 0;
+      setCurrentStep((prev) => Math.max(prev, hubStep));
     }
-    setCurrentStep((s) => s + 1);
+  }, [order?.status]);
+
+  if (!order) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] px-8 text-center">
+        <MapPin className="w-12 h-12 text-muted-foreground mb-3" />
+        <p className="text-lg font-semibold text-foreground">No Active Delivery</p>
+        <p className="text-sm text-muted-foreground mt-1">Accept an order to get started</p>
+      </div>
+    );
+  }
+
+  const advanceStep = async () => {
+    if (currentStep >= steps.length - 1) return;
+    setUpdating(true);
+
+    try {
+      // Step 2→3: arrived_pickup → picked_up → hub update
+      if (currentStep === 2) {
+        const { success, error } = await updateStatus(order.hubOrderId, "picked_up");
+        if (!success) {
+          toast({ title: "Update failed", description: error, variant: "destructive" });
+          setUpdating(false);
+          return;
+        }
+      }
+
+      // Step 3→4: picked_up → in_transit → hub update to on_the_way
+      if (currentStep === 3) {
+        const { success, error } = await updateStatus(order.hubOrderId, "on_the_way");
+        if (!success) {
+          toast({ title: "Update failed", description: error, variant: "destructive" });
+          setUpdating(false);
+          return;
+        }
+      }
+
+      // Step 5: arrived_delivery → navigate to complete
+      if (currentStep === 5) {
+        navigate("/agent/complete-delivery");
+        return;
+      }
+
+      setCurrentStep((s) => s + 1);
+    } finally {
+      setUpdating(false);
+    }
   };
 
   return (
     <div className="px-4 py-4 space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-foreground">Active Delivery</h1>
-        <span className="text-xs text-muted-foreground">{mockOrder.id}</span>
+        <span className="text-xs text-muted-foreground">{order.hubOrderId}</span>
       </div>
 
       {/* Map placeholder */}
@@ -64,7 +113,6 @@ export default function ActiveDeliveryPage() {
           <p className="text-xs text-muted-foreground">Map view</p>
           <p className="text-[10px] text-muted-foreground">Connect Google Maps API to enable</p>
         </div>
-        {/* Pin markers */}
         <div className="absolute top-6 left-8 flex items-center gap-1">
           <div className="w-3 h-3 rounded-full bg-primary" />
           <span className="text-[9px] text-primary font-medium">Pickup</span>
@@ -86,11 +134,13 @@ export default function ActiveDeliveryPage() {
           <div className="flex-1 space-y-4">
             <div>
               <p className="text-[10px] text-muted-foreground">Pickup</p>
-              <p className="text-sm font-medium text-foreground">{mockOrder.pickup}</p>
+              <p className="text-sm font-medium text-foreground">
+                {order.pickupAddress || "Pickup location"}
+              </p>
             </div>
             <div>
               <p className="text-[10px] text-muted-foreground">Delivery</p>
-              <p className="text-sm font-medium text-foreground">{mockOrder.delivery}</p>
+              <p className="text-sm font-medium text-foreground">{order.deliveryAddress}</p>
             </div>
           </div>
         </div>
@@ -116,20 +166,10 @@ export default function ActiveDeliveryPage() {
                   {i < currentStep ? <Check className="w-3 h-3" /> : i + 1}
                 </div>
                 {i < steps.length - 1 && (
-                  <div
-                    className={cn(
-                      "w-px h-6",
-                      i < currentStep ? "bg-primary" : "bg-border"
-                    )}
-                  />
+                  <div className={cn("w-px h-6", i < currentStep ? "bg-primary" : "bg-border")} />
                 )}
               </div>
-              <p
-                className={cn(
-                  "text-sm pt-0.5",
-                  i <= currentStep ? "text-foreground font-medium" : "text-muted-foreground"
-                )}
-              >
+              <p className={cn("text-sm pt-0.5", i <= currentStep ? "text-foreground font-medium" : "text-muted-foreground")}>
                 {step.label}
               </p>
             </div>
@@ -138,38 +178,42 @@ export default function ActiveDeliveryPage() {
       </div>
 
       {/* Delivery Notes */}
-      {mockOrder.notes && (
+      {order.specialInstructions && (
         <div className="glass rounded-2xl p-4 border-accent/20 border">
           <div className="flex items-center gap-2 mb-2">
             <FileText className="w-4 h-4 text-accent" />
             <p className="text-sm font-semibold text-foreground">Delivery Notes</p>
           </div>
-          <p className="text-sm text-muted-foreground leading-relaxed">{mockOrder.notes}</p>
+          <p className="text-sm text-muted-foreground leading-relaxed">{order.specialInstructions}</p>
         </div>
       )}
 
       {/* Actions */}
       <div className="flex gap-3">
-        <a
-          href={`tel:${mockOrder.phone}`}
-          className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl glass text-sm font-medium text-foreground active:scale-95 transition-transform"
-        >
-          <Phone className="w-4 h-4" />
-          Call
-        </a>
-        <a
-          href={`https://wa.me/${mockOrder.phone.replace("+", "")}`}
-          target="_blank"
-          rel="noreferrer"
-          className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl glass text-sm font-medium text-primary active:scale-95 transition-transform"
-        >
-          <MessageCircle className="w-4 h-4" />
-          WhatsApp
-        </a>
+        {order.customerPhone && (
+          <>
+            <a
+              href={`tel:${order.customerPhone}`}
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl glass text-sm font-medium text-foreground active:scale-95 transition-transform"
+            >
+              <Phone className="w-4 h-4" />
+              Call
+            </a>
+            <a
+              href={`https://wa.me/${order.customerPhone.replace("+", "")}`}
+              target="_blank"
+              rel="noreferrer"
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl glass text-sm font-medium text-primary active:scale-95 transition-transform"
+            >
+              <MessageCircle className="w-4 h-4" />
+              WhatsApp
+            </a>
+          </>
+        )}
         <button
           onClick={() => {
             window.open(
-              `https://www.google.com/maps/dir/?api=1&destination=${mockOrder.deliveryLat},${mockOrder.deliveryLng}`,
+              `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.deliveryAddress)}`,
               "_blank"
             );
           }}
@@ -185,8 +229,10 @@ export default function ActiveDeliveryPage() {
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={advanceStep}
-          className="w-full py-4 rounded-2xl bg-primary text-primary-foreground text-base font-bold active:scale-[0.98] transition-transform"
+          disabled={updating}
+          className="w-full py-4 rounded-2xl bg-primary text-primary-foreground text-base font-bold active:scale-[0.98] transition-transform disabled:opacity-50 flex items-center justify-center gap-2"
         >
+          {updating && <Loader2 className="w-5 h-5 animate-spin" />}
           {nextLabels[steps[currentStep].key] || "Next Step"}
         </motion.button>
       )}

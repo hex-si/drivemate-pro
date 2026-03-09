@@ -1,35 +1,106 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Camera, CheckSquare, PartyPopper } from "lucide-react";
+import { Camera, CheckSquare, PartyPopper, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
+import { useHubOrders } from "@/hooks/useHubOrders";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 export default function CompleteDeliveryPage() {
   const navigate = useNavigate();
-  const [photo, setPhoto] = useState<string | null>(null);
+  const { orders, updateStatus } = useHubOrders();
+  const { agent } = useAuth();
+  const { toast } = useToast();
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
   const [completed, setCompleted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [localOrder, setLocalOrder] = useState<any>(null);
+
+  const order = orders.find(
+    (o) => o.status === "on_the_way" || o.status === "picked_up"
+  );
+
+  // Fetch local order for fee breakdown
+  useEffect(() => {
+    if (!order || !agent) return;
+    const fetchLocal = async () => {
+      const { data } = await supabase
+        .from("delivery_orders")
+        .select("*")
+        .eq("order_code", order.hubOrderId)
+        .maybeSingle();
+      if (data) setLocalOrder(data);
+    };
+    fetchLocal();
+  }, [order?.hubOrderId, agent]);
 
   const fees = {
-    base: 15.00,
-    distance: 5.50,
-    weight: 1.50,
-    fragility: 0,
-    weather: 0,
-    urgency: 0,
+    base: localOrder?.base_fee || 0,
+    distance: localOrder?.distance_surcharge || 0,
+    weight: localOrder?.weight_surcharge || 0,
+    fragility: localOrder?.fragility_surcharge || 0,
+    weather: localOrder?.weather_adjustment || 0,
+    urgency: localOrder?.urgency_bonus || 0,
   };
-  const total = Object.values(fees).reduce((a, b) => a + b, 0);
+  const total = localOrder?.total_fee || order?.fee || 0;
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setPhoto(URL.createObjectURL(file));
+      setPhotoFile(file);
+      setPhotoPreview(URL.createObjectURL(file));
     }
   };
 
-  const handleComplete = () => {
-    setCompleted(true);
-    setTimeout(() => navigate("/agent/dashboard"), 3000);
+  const handleComplete = async () => {
+    if (!order) return;
+    setSubmitting(true);
+
+    try {
+      let photoUrl: string | null = null;
+
+      // Upload proof photo
+      if (photoFile) {
+        const ext = photoFile.name.split(".").pop();
+        const path = `${order.hubOrderId}/${Date.now()}.${ext}`;
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from("delivery-proofs")
+          .upload(path, photoFile);
+
+        if (uploadError) {
+          toast({ title: "Photo upload failed", description: uploadError.message, variant: "destructive" });
+          setSubmitting(false);
+          return;
+        }
+        photoUrl = supabase.storage.from("delivery-proofs").getPublicUrl(uploadData.path).data.publicUrl;
+      }
+
+      // Update local order with proof
+      if (localOrder && photoUrl) {
+        await supabase
+          .from("delivery_orders")
+          .update({ proof_photo_url: photoUrl, status: "delivered" as any })
+          .eq("id", localOrder.id);
+      }
+
+      // Update hub status
+      const { success, error } = await updateStatus(order.hubOrderId, "delivered");
+      if (!success) {
+        toast({ title: "Status update failed", description: error, variant: "destructive" });
+        setSubmitting(false);
+        return;
+      }
+
+      setCompleted(true);
+      setTimeout(() => navigate("/agent/dashboard"), 3000);
+    } catch (e) {
+      toast({ title: "Error", description: (e as Error).message, variant: "destructive" });
+      setSubmitting(false);
+    }
   };
 
   if (completed) {
@@ -54,6 +125,15 @@ export default function CompleteDeliveryPage() {
     );
   }
 
+  if (!order) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] px-8 text-center">
+        <p className="text-lg font-semibold text-foreground">No delivery to complete</p>
+        <p className="text-sm text-muted-foreground mt-1">Go back to your dashboard</p>
+      </div>
+    );
+  }
+
   return (
     <div className="px-4 py-4 space-y-5">
       <h1 className="text-xl font-bold text-foreground">Complete Delivery</h1>
@@ -61,11 +141,11 @@ export default function CompleteDeliveryPage() {
       {/* Photo Upload */}
       <div className="glass rounded-2xl p-4 space-y-3">
         <p className="text-sm font-semibold text-foreground">Proof of Delivery</p>
-        {photo ? (
+        {photoPreview ? (
           <div className="relative rounded-xl overflow-hidden">
-            <img src={photo} alt="Proof" className="w-full h-48 object-cover" />
+            <img src={photoPreview} alt="Proof" className="w-full h-48 object-cover" />
             <button
-              onClick={() => setPhoto(null)}
+              onClick={() => { setPhotoFile(null); setPhotoPreview(null); }}
               className="absolute top-2 right-2 px-2 py-1 rounded-lg bg-background/80 text-xs text-foreground"
             >
               Retake
@@ -76,13 +156,7 @@ export default function CompleteDeliveryPage() {
             <Camera className="w-8 h-8 text-muted-foreground mb-2" />
             <p className="text-sm text-muted-foreground">Tap to take photo</p>
             <p className="text-[10px] text-muted-foreground">or choose from gallery</p>
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={handlePhotoUpload}
-            />
+            <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoUpload} />
           </label>
         )}
       </div>
@@ -95,12 +169,10 @@ export default function CompleteDeliveryPage() {
           confirmed && "border-primary/40 border"
         )}
       >
-        <div
-          className={cn(
-            "w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all",
-            confirmed ? "bg-primary border-primary" : "border-muted-foreground"
-          )}
-        >
+        <div className={cn(
+          "w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all",
+          confirmed ? "bg-primary border-primary" : "border-muted-foreground"
+        )}>
           {confirmed && <CheckSquare className="w-4 h-4 text-primary-foreground" />}
         </div>
         <p className="text-sm text-foreground">Recipient confirmed package received</p>
@@ -110,9 +182,9 @@ export default function CompleteDeliveryPage() {
       <div className="glass rounded-2xl p-4 space-y-3">
         <p className="text-sm font-semibold text-foreground">Fee Summary</p>
         <div className="space-y-2">
-          <FeeRow label="Base fee" value={fees.base} />
-          <FeeRow label="Distance surcharge" value={fees.distance} />
-          <FeeRow label="Weight surcharge" value={fees.weight} />
+          {fees.base > 0 && <FeeRow label="Base fee" value={fees.base} />}
+          {fees.distance > 0 && <FeeRow label="Distance surcharge" value={fees.distance} />}
+          {fees.weight > 0 && <FeeRow label="Weight surcharge" value={fees.weight} />}
           {fees.fragility > 0 && <FeeRow label="Fragility surcharge" value={fees.fragility} />}
           {fees.weather > 0 && <FeeRow label="Weather adjustment" value={fees.weather} />}
           {fees.urgency > 0 && <FeeRow label="Urgency bonus" value={fees.urgency} />}
@@ -127,14 +199,15 @@ export default function CompleteDeliveryPage() {
       <motion.button
         whileTap={{ scale: 0.97 }}
         onClick={handleComplete}
-        disabled={!photo || !confirmed}
+        disabled={!photoFile || !confirmed || submitting}
         className={cn(
-          "w-full py-4 rounded-2xl text-base font-bold transition-all",
-          photo && confirmed
+          "w-full py-4 rounded-2xl text-base font-bold transition-all flex items-center justify-center gap-2",
+          photoFile && confirmed
             ? "bg-primary text-primary-foreground active:scale-[0.98]"
             : "bg-secondary text-muted-foreground cursor-not-allowed"
         )}
       >
+        {submitting && <Loader2 className="w-5 h-5 animate-spin" />}
         Complete Delivery
       </motion.button>
     </div>
