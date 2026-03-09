@@ -64,12 +64,6 @@ export default function DashboardPage() {
         <AvailabilityToggle status={status} onStatusChange={setStatus} />
       </motion.div>
 
-      {/* Connection Status */}
-      {!hubConnected && (
-        <motion.div variants={item} className="bg-accent/10 border border-accent/30 rounded-xl p-3 flex items-center gap-2">
-          <span className="text-xs text-accent font-medium">⚠ Hub not connected — showing cached orders</span>
-        </motion.div>
-      )}
 
       {/* Stats */}
       <motion.div variants={item} className="grid grid-cols-3 gap-3">
