@@ -1,11 +1,14 @@
 import { Outlet } from "react-router-dom";
 import BottomNav from "./BottomNav";
-import { Bell, Download } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Download } from "lucide-react";
 import { useInstallPrompt } from "@/hooks/useInstallPrompt";
+import NotificationBell from "@/components/notifications/NotificationBell";
+import { useRealtimeNotifications } from "@/hooks/useRealtimeNotifications";
 
 export default function AgentLayout() {
   const { canInstall, install } = useInstallPrompt();
+  const { unreadCount } = useRealtimeNotifications();
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="fixed top-0 left-0 right-0 z-40 glass-strong">
@@ -23,10 +26,7 @@ export default function AgentLayout() {
                 <Download className="w-4 h-4" />
               </button>
             )}
-            <Link to="/agent/notifications" className="relative p-2 -mr-2">
-              <Bell className="w-5 h-5 text-muted-foreground" />
-              {/* Badge will be added with real data */}
-            </Link>
+            <NotificationBell unreadCount={unreadCount} />
           </div>
         </div>
       </header>
