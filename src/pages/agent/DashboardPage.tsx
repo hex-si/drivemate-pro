@@ -22,7 +22,7 @@ const item = {
 };
 
 export default function DashboardPage() {
-  const [status, setStatus] = useState<"online" | "offline" | "busy">("offline");
+  const { status, changeStatus } = useAgentAvailability();
   const { agent } = useAuth();
   const { orders, hubConnected } = useHubOrders();
   const agentName = agent?.full_name?.split(" ")[0] || "Agent";
