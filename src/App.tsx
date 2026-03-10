@@ -69,6 +69,8 @@ const App = () => (
               <Route path="profile" element={<ProfilePage />} />
               <Route path="notifications" element={<NotificationsPage />} />
               <Route path="receipt/:orderId" element={<ReceiptPage />} />
+              <Route path="new-order" element={<NewOrderPage />} />
+              <Route path="history" element={<DeliveryHistoryPage />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
