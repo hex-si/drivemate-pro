@@ -54,6 +54,11 @@ export default function ReceiptPage() {
           <ArrowLeft className="w-5 h-5 text-foreground" />
         </button>
         <div className="flex gap-2">
+          {order.customerPhone && (
+            <button onClick={handleWhatsAppShare} className="p-2 rounded-xl bg-[#25D366]/15 active:scale-95 transition-transform">
+              <MessageCircle className="w-5 h-5 text-[#25D366]" />
+            </button>
+          )}
           {navigator.share && (
             <button onClick={handleShare} className="p-2 glass rounded-xl active:scale-95 transition-transform">
               <Share2 className="w-5 h-5 text-foreground" />
