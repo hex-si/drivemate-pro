@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useHubOrders } from "@/hooks/useHubOrders";
-import { ArrowLeft, Printer, Share2 } from "lucide-react";
+import { ArrowLeft, Printer, Share2, MessageCircle, Download } from "lucide-react";
 import { format } from "date-fns";
 
 export default function ReceiptPage() {
