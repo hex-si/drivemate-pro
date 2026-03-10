@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useHubOrders } from "@/hooks/useHubOrders";
-import { ArrowLeft, Printer, Share2 } from "lucide-react";
+import { ArrowLeft, Printer, Share2, MessageCircle, Download } from "lucide-react";
 import { format } from "date-fns";
 
 export default function ReceiptPage() {
@@ -30,6 +30,22 @@ export default function ReceiptPage() {
     }
   };
 
+  const handleWhatsAppShare = () => {
+    const cleanPhone = order.customerPhone?.replace(/[^0-9+]/g, "").replace("+", "") || "";
+    const msg = encodeURIComponent(
+      `📦 *DeliverPro Receipt*\n\n` +
+      `Order: ${order.hubOrderId}\n` +
+      `Customer: ${order.customerName}\n` +
+      `Delivered to: ${order.deliveryAddress}\n` +
+      `Total: ₵${order.total.toFixed(2)}\n` +
+      `Fee: ₵${order.fee.toFixed(2)}\n` +
+      `Grand Total: ₵${(order.total + order.fee).toFixed(2)}\n` +
+      `Date: ${format(new Date(order.createdAt), "dd MMM yyyy, hh:mm a")}\n\n` +
+      `Thank you for choosing DeliverPro! 🚀`
+    );
+    window.open(`https://wa.me/${cleanPhone}?text=${msg}`, "_blank");
+  };
+
   return (
     <div className="px-4 py-4 space-y-4">
       {/* Header - hidden on print */}
@@ -38,6 +54,11 @@ export default function ReceiptPage() {
           <ArrowLeft className="w-5 h-5 text-foreground" />
         </button>
         <div className="flex gap-2">
+          {order.customerPhone && (
+            <button onClick={handleWhatsAppShare} className="p-2 rounded-xl bg-[#25D366]/15 active:scale-95 transition-transform">
+              <MessageCircle className="w-5 h-5 text-[#25D366]" />
+            </button>
+          )}
           {navigator.share && (
             <button onClick={handleShare} className="p-2 glass rounded-xl active:scale-95 transition-transform">
               <Share2 className="w-5 h-5 text-foreground" />

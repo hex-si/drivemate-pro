@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { 
   CheckCircle2, DollarSign, Star, MapPin, 
-  Package, TrendingUp, User, Zap 
+  Package, TrendingUp, User, Zap, PlusCircle, History 
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAgentAvailability } from "@/hooks/useAgentAvailability";
@@ -88,16 +88,10 @@ export default function DashboardPage() {
       <motion.div variants={item}>
         <p className="text-sm font-semibold text-foreground mb-3">Quick Actions</p>
         <div className="grid grid-cols-4 gap-2">
+          <QuickAction to="/agent/new-order" icon={PlusCircle} label="New Order" highlight />
           <QuickAction to="/agent/orders" icon={Package} label="Orders" />
+          <QuickAction to="/agent/history" icon={History} label="History" />
           <QuickAction to="/agent/earnings" icon={TrendingUp} label="Earnings" />
-          <QuickAction to="/agent/profile" icon={User} label="Profile" />
-          <QuickAction
-            to="#"
-            icon={Zap}
-            label="Go Online"
-            highlight={status === "offline"}
-            onClick={() => changeStatus("online")}
-          />
         </div>
       </motion.div>
 
