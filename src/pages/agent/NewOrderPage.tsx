@@ -73,6 +73,31 @@ export default function NewOrderPage() {
       return;
     }
 
+    // Auto-save customer for repeat tracking
+    try {
+      const { data: existing } = await supabase
+        .from("customers")
+        .select("id, total_orders")
+        .eq("agent_user_id", agent.user_id)
+        .eq("phone", customerPhone.trim())
+        .maybeSingle();
+
+      if (existing) {
+        await supabase.from("customers").update({
+          total_orders: (existing.total_orders || 0) + 1,
+          address: deliveryAddress.trim(),
+        }).eq("id", existing.id);
+      } else {
+        await supabase.from("customers").insert({
+          agent_user_id: agent.user_id,
+          name: customerName.trim(),
+          phone: customerPhone.trim(),
+          address: deliveryAddress.trim(),
+          total_orders: 1,
+        });
+      }
+    } catch {}
+
     setCreated({ orderCode, phone: customerPhone.trim(), address: deliveryAddress.trim() });
     toast({ title: "Order created! ✓" });
   };
